@@ -12,3 +12,4 @@ async def gather_sites(sites):
         tasks.append(task)
 
     await asyncio.gather(*tasks)
+    return

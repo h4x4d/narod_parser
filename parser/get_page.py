@@ -1,3 +1,5 @@
+import random
+
 import aiohttp
 import aiosqlite
 import asyncio
@@ -8,50 +10,41 @@ from constants import DATABASE
 from database import Database
 from parser.proccess import make_links_absolute, get_plain_text
 from parser.utils import check_binary, get_headers
+from parser.data import *
+
+
+async def wait_for_page(url):
+    while len([i for i in pages if i[1] == url]) == 0:
+        await asyncio.sleep(1)
+    return
 
 
 async def get_page(session: aiohttp.ClientSession, url: str,
                    lock: asyncio.Lock, root=0):
-    try:
-        url = url.strip('/')
-        if not validators.url(url):
-            return
+    url = url.strip('/')
+    if url.rfind('/') < url.rfind('#'):
+        url = url[:url.rfind('#')]
+    binary = check_binary(url)
+    if not validators.url(url) or 'panel' in url:
+        return
 
-        db = Database(await aiosqlite.connect(DATABASE), lock)
-        binary = check_binary(url)
-        table = 'files' if binary else 'pages'
-        query = await (await db.execute(f'SELECT * FROM {table} WHERE url = ?',
-                                        (url,))).fetchone()
-
-        if query:
-            if not binary and root:
-                await db.execute('INSERT INTO children VALUES (?, ?, ?)',
-                                 (None, root, query[0]))
-            return
-
+    if url in links:
         if not binary:
-            cursor = (await db.execute(
-                'INSERT INTO pages VALUES (?, ?, ?, ?, ?)',
-                (None, url, None, None, None)))
-            if cursor:
-                index = cursor.lastrowid
-            else:
-                return
+            try:
+                await asyncio.wait_for(wait_for_page(url), timeout=30)
+                relations.add((None, root, [i for i in pages if i[1] == url][0][0]))
+            except asyncio.TimeoutError:
+                print('timeout', url)
+
+        return
+    links.add(url)
+    print('good', url)
+
+    try:
 
         await asyncio.sleep(0.1)
         async with session.get(url, headers=get_headers()) as response:
-            print(url)
             await asyncio.sleep(0.1)
-
-            if binary:
-                if root > 0:
-                    filename = url[url.rfind('/') + 1:].lower()
-                    await db.execute(
-                        'INSERT INTO files VALUES(?, ?, ?, ?, ?, ?)',
-                        (None, url, filename[:filename.rfind('.')],
-                         filename[filename.rfind('.') + 1:],
-                         await response.content.read(), root))
-                return
 
             if response.status != 200:
                 await asyncio.sleep(1)
@@ -59,6 +52,14 @@ async def get_page(session: aiohttp.ClientSession, url: str,
 
                 if response.status != 200:
                     return
+
+            if binary:
+                if root > 0:
+                    filename = url[url.rfind('/') + 1:].lower()
+                    files.add((None, url, filename[:filename.rfind('.')],
+                               filename[filename.rfind('.') + 1:],
+                               await response.content.read(), root))
+                return
 
             text = await response.text(errors='replace')
             while '503' in text and 'Service' in text:
@@ -72,29 +73,28 @@ async def get_page(session: aiohttp.ClientSession, url: str,
             soup = BeautifulSoup(text, features="html.parser")
             plain_text = await get_plain_text(soup)
             title = soup.title.string if soup.title else ""
-            await db.execute(
-                'UPDATE pages SET page_name = ?, pure_html = ?, '
-                'plain_text = ? WHERE id = ?',
-                (title, text, plain_text, index))
+
+            index = len(pages) + 1
+            pages.add((index, url, str(title), text, plain_text))
 
             if root > 0:
-                await db.execute(
-                    'INSERT INTO children VALUES (?, ?, ?)',
-                    (None, root, index))
+                relations.add((None, root, index))
 
             site = url[url.find('://') + 3:]
             site = site[:site.find('/')]
             tasks = []
-            for link in soup.findAll('a'):
+            for link in set(soup.findAll('a')):
                 link = link.get('href')
                 if link and site in link:
                     task = asyncio.create_task(
                         get_page(session, link, lock, index))
                     tasks.append(task)
 
-            await asyncio.gather(*tasks)
+            if tasks:
+                await asyncio.gather(*tasks)
 
-            return index
+            return index, title
+
     except aiohttp.ClientConnectorError:
         print('Client error:', url)
     except aiohttp.ServerDisconnectedError:

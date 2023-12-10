@@ -1,5 +1,3 @@
-import sqlite3
-
 import aiohttp
 import aiosqlite
 import asyncio
@@ -7,6 +5,7 @@ import validators
 from bs4 import BeautifulSoup
 
 from constants import DATABASE
+from database import Database
 from parser.proccess import make_links_absolute, get_plain_text
 from parser.utils import check_binary, get_headers
 
@@ -18,30 +17,26 @@ async def get_page(session: aiohttp.ClientSession, url: str,
         if not validators.url(url):
             return
 
-        db = await aiosqlite.connect(DATABASE)
+        db = Database(await aiosqlite.connect(DATABASE), lock)
         binary = check_binary(url)
         table = 'files' if binary else 'pages'
-        async with lock:
-            query = await (await db.execute(f'SELECT * FROM {table} WHERE url = ?',
+        query = await (await db.execute(f'SELECT * FROM {table} WHERE url = ?',
                                         (url,))).fetchone()
 
         if query:
             if not binary and root:
-                async with lock:
-                    await db.execute('INSERT INTO children VALUES (?, ?, ?)',
-                                     (None, root, query[0]))
-                    await db.commit()
+                await db.execute('INSERT INTO children VALUES (?, ?, ?)',
+                                 (None, root, query[0]))
             return
 
         if not binary:
-            async with lock:
-                try:
-                    index = (await db.execute('INSERT INTO pages VALUES (?, ?, ?, ?, ?)',
-                                              (None, url, None, None, None))).lastrowid
-                    await db.commit()
-                except sqlite3.IntegrityError:
-                    await db.rollback()
-                    return
+            cursor = (await db.execute(
+                'INSERT INTO pages VALUES (?, ?, ?, ?, ?)',
+                (None, url, None, None, None)))
+            if cursor:
+                index = cursor.lastrowid
+            else:
+                return
 
         await asyncio.sleep(0.1)
         async with session.get(url, headers=get_headers()) as response:
@@ -51,17 +46,11 @@ async def get_page(session: aiohttp.ClientSession, url: str,
             if binary:
                 if root > 0:
                     filename = url[url.rfind('/') + 1:].lower()
-                    try:
-                        async with lock:
-                            await db.execute(
-                                'INSERT INTO files VALUES(?, ?, ?, ?, ?, ?)',
-                                (None, url, filename[:filename.rfind('.')],
-                                 filename[filename.rfind('.') + 1:],
-                                 await response.content.read(), root))
-                            await db.commit()
-                    except sqlite3.IntegrityError:
-                        await db.rollback()
-                        return
+                    await db.execute(
+                        'INSERT INTO files VALUES(?, ?, ?, ?, ?, ?)',
+                        (None, url, filename[:filename.rfind('.')],
+                         filename[filename.rfind('.') + 1:],
+                         await response.content.read(), root))
                 return
 
             if response.status != 200:
@@ -83,17 +72,15 @@ async def get_page(session: aiohttp.ClientSession, url: str,
             soup = BeautifulSoup(text, features="html.parser")
             plain_text = await get_plain_text(soup)
             title = soup.title.string if soup.title else ""
-            async with lock:
-                await db.execute(
-                    'UPDATE pages SET page_name = ?, pure_html = ?, '
-                    'plain_text = ? WHERE id = ?',
-                    (title, text, plain_text, index))
+            await db.execute(
+                'UPDATE pages SET page_name = ?, pure_html = ?, '
+                'plain_text = ? WHERE id = ?',
+                (title, text, plain_text, index))
 
-                if root > 0:
-                    await db.execute(
-                        'INSERT INTO children VALUES (?, ?, ?)',
-                        (None, root, index))
-                await db.commit()
+            if root > 0:
+                await db.execute(
+                    'INSERT INTO children VALUES (?, ?, ?)',
+                    (None, root, index))
 
             site = url[url.find('://') + 3:]
             site = site[:site.find('/')]
@@ -101,7 +88,8 @@ async def get_page(session: aiohttp.ClientSession, url: str,
             for link in soup.findAll('a'):
                 link = link.get('href')
                 if link and site in link:
-                    task = asyncio.create_task(get_page(session, link, lock, index))
+                    task = asyncio.create_task(
+                        get_page(session, link, lock, index))
                     tasks.append(task)
 
             await asyncio.gather(*tasks)
@@ -115,4 +103,3 @@ async def get_page(session: aiohttp.ClientSession, url: str,
         print('Payload error:', url)
     except asyncio.TimeoutError:
         print('Time error:', url)
-

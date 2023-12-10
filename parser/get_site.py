@@ -2,6 +2,7 @@ import aiohttp
 import aiosqlite
 
 from constants import DATABASE
+from database import Database
 from parser.get_page import get_page
 
 
@@ -10,9 +11,7 @@ async def get_site(url: str, lock):
             connector=aiohttp.TCPConnector(limit=50)) as session:
         root = await get_page(session, url, lock)
 
-        async with aiosqlite.connect(DATABASE) as db:
-            async with lock:
-                await db.execute(
-                    'INSERT INTO sites VALUES(?, ?, ?, ?)',
-                    (None, url, root[1], root[0]))
-                await db.commit()
+        db = Database(await aiosqlite.connect(DATABASE), lock)
+        await db.execute(
+            'INSERT INTO sites VALUES(?, ?, ?, ?)',
+            (None, url, root[1], root[0]))

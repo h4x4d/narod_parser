@@ -1,4 +1,4 @@
-from parser.data import *
+from parser.data import pages, sites, relations, files
 
 import aiosqlite
 
@@ -12,6 +12,7 @@ async def fill_database(name):
         for rel in relations:
             await db.execute('INSERT INTO children VALUES(?, ?, ?)', rel)
         for file in files:
-            await db.execute('INSERT INTO files VALUES(?, ?, ?, ?, ?, ?)', file)
+            await db.execute('INSERT INTO files VALUES(?, ?, ?, ?, ?, ?)',
+                             file)
 
         await db.commit()

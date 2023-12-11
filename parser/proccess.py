@@ -15,11 +15,11 @@ def make_links_absolute(html, root_url):
 
 
 async def get_plain_text(soup: BeautifulSoup):
-    for script in soup(["script", "style"]):
+    for script in soup(['script', 'style']):
         script.extract()
 
     text = soup.get_text()
 
     lines = (line.strip() for line in text.splitlines())
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    chunks = (phrase.strip() for line in lines for phrase in line.split('  '))
     return '\n'.join(chunk for chunk in chunks if chunk)

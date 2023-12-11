@@ -1,13 +1,12 @@
 import datetime
-import sys
 
-from constants import *
+from constants import DATABASE, FILENAME
 from parser import gather_sites
 from database import create_database, fill_database
 
 import asyncio
 
-sys.stdout = open('out.txt', 'w', encoding='utf-8')
+# sys.stdout = open('out.txt', 'w', encoding='utf-8')
 
 
 async def main(filename=FILENAME, database=DATABASE):

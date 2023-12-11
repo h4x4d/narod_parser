@@ -8,7 +8,7 @@ async def create_database(name, rewrite=True):
         os.remove(name)
 
     async with aiosqlite.connect(name) as db:
-        await db.execute('''
+        await db.execute("""
         CREATE TABLE IF NOT EXISTS pages (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           url TEXT UNIQUE,
@@ -17,9 +17,9 @@ async def create_database(name, rewrite=True):
           pure_html TEXT,
           plain_text TEXT
         )
-        ''')
+        """)
 
-        await db.execute('''
+        await db.execute("""
         CREATE TABLE IF NOT EXISTS children (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           root_id INTEGER,
@@ -27,9 +27,9 @@ async def create_database(name, rewrite=True):
           FOREIGN KEY (root_id)  REFERENCES pages(id),
           FOREIGN KEY (child_id)  REFERENCES pages(id)
         )
-        ''')
+        """)
 
-        await db.execute('''
+        await db.execute("""
         CREATE TABLE IF NOT EXISTS sites (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           url TEXT UNIQUE,
@@ -37,9 +37,9 @@ async def create_database(name, rewrite=True):
           root_id INTEGER,
           FOREIGN KEY (root_id)  REFERENCES pages(id)
         )
-        ''')
+        """)
 
-        await db.execute('''
+        await db.execute("""
         CREATE TABLE IF NOT EXISTS files (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           url TEXT UNIQUE,
@@ -49,4 +49,4 @@ async def create_database(name, rewrite=True):
           page_id INTEGER,
           FOREIGN KEY (page_id)  REFERENCES pages(id)
         )
-        ''')
+        """)

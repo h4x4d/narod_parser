@@ -6,6 +6,8 @@ from database import create_database, fill_database
 
 import asyncio
 
+from parser.data import troubles
+
 # sys.stdout = open('out.txt', 'w', encoding='utf-8')
 
 
@@ -16,6 +18,11 @@ async def main(filename=FILENAME, database=DATABASE):
 
     sites = [i.strip() for i in open(filename)]
     await gather_sites(sites)
+    while troubles:
+        tr = troubles.copy()
+        troubles.clear()
+        await gather_sites(list(tr))
+
     print('END PARSING')
 
     await fill_database(database)

@@ -16,3 +16,8 @@ async def fill_database(name):
                              file)
 
         await db.commit()
+
+    pages.clear()
+    sites.clear()
+    relations.clear()
+    files.clear()

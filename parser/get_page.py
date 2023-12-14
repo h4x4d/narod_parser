@@ -15,6 +15,7 @@ async def wait_for_page(url):
 
 async def process_page(session, url, root, binary, semaphore):
     await asyncio.sleep(0.1)
+
     async with session.get(url, headers=get_headers()) as response:
         await asyncio.sleep(0.1)
 
@@ -60,15 +61,17 @@ async def process_page(session, url, root, binary, semaphore):
             relations.add((None, root, index))
 
         site = url[url.find('://') + 3:]
-        site = site[:site.find('/')]
+        if '/' in site:
+            site = site[:site.find('/')]
         tasks = []
+        '''
         for link in set(soup.findAll('a')):
             link = link.get('href')
             if link and site in link:
                 task = asyncio.create_task(
                     get_page(session, link, semaphore, index))
                 tasks.append(task)
-
+        '''
         semaphore.release()
 
         if tasks:

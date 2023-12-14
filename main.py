@@ -6,9 +6,9 @@ from database import create_database, fill_database
 
 import asyncio
 
-from parser.data import troubles
+from parser.data import troubles, links, sites as st
 
-# sys.stdout = open('out.txt', 'w', encoding='utf-8')
+sys.stdout = open('out.txt', 'w', encoding='utf-8')
 
 
 async def main(filename=FILENAME, database=DATABASE):
@@ -18,15 +18,22 @@ async def main(filename=FILENAME, database=DATABASE):
 
     sites = [i.strip() for i in open(filename)]
     await gather_sites(sites)
-    while troubles:
-        tr = troubles.copy()
-        troubles.clear()
-        await gather_sites(list(tr))
 
     print('END PARSING')
+    print('NOW PARSING ERRORED')
+    count = 0
 
+    while troubles and count < 4:
+        tr = troubles.copy()
+        tr = [i for i in tr if all(j[1] != i for j in st)]
+        troubles.clear()
+        links.clear()
+        await gather_sites(list(tr))
+        count += 1
+
+    print('ERRORED PARSED')
     await fill_database(database)
-    print('END:', datetime.datetime.now() - start)
+    print('END OF PARSING:', datetime.datetime.now() - start)
 
 
 if __name__ == '__main__':

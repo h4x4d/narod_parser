@@ -64,14 +64,14 @@ async def process_page(session, url, root, binary, semaphore):
         if '/' in site:
             site = site[:site.find('/')]
         tasks = []
-        '''
+
         for link in set(soup.findAll('a')):
             link = link.get('href')
             if link and site in link:
                 task = asyncio.create_task(
                     get_page(session, link, semaphore, index))
                 tasks.append(task)
-        '''
+
         semaphore.release()
 
         if tasks:

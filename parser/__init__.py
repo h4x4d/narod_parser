@@ -1,1 +1,1 @@
-from .gather_sites import gather_sites
+from .gather_sites import split_and_gather_sites

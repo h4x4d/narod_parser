@@ -7,3 +7,5 @@ relations = set()
 links = set()
 
 troubles = set()
+
+page_index = 1

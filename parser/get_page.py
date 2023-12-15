@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 from parser.proccess import make_links_absolute, get_plain_text
 from parser.utils import check_binary, get_headers
-from parser.data import pages, files, relations, links
+from parser.data import pages, files, relations, links, page_index
 
 
 async def wait_for_page(url):
@@ -14,6 +14,8 @@ async def wait_for_page(url):
 
 
 async def process_page(session, url, root, binary, semaphore):
+    global page_index
+
     await asyncio.sleep(0.1)
 
     async with session.get(url, headers=get_headers()) as response:
@@ -54,7 +56,8 @@ async def process_page(session, url, root, binary, semaphore):
         plain_text = await get_plain_text(soup)
         title = soup.title.string if soup.title else ''
 
-        index = len(pages) + 1
+        index = page_index
+        page_index += 1
         pages.add((index, url, str(title), text, plain_text))
 
         if root > 0:

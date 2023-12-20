@@ -11,7 +11,7 @@ from parser.data import troubles
 
 async def gather_sites(sites):
     tasks = []
-    semaphore = asyncio.Semaphore(LIMIT)
+    semaphore = asyncio.BoundedSemaphore(LIMIT)
 
     async with aiohttp.ClientSession() as session:
         for site_link in sites:
@@ -27,9 +27,9 @@ async def split_and_gather_sites(sites, database):
     for i in range(0, len(sites), GROUP_SIZE):
         try:
             await gather_sites(sites[i:i + GROUP_SIZE])
-            print(f'GROUP {i} finished parsing')
+            print(f'GROUP {i//5} finished parsing')
             await fill_database(database)
-            print(f'GROUP {i} finished writing to db')
+            print(f'GROUP {i//5} finished writing to db')
         except Exception as e:
             print(f'GROUP {sites[i:i + GROUP_SIZE]} failed. Reason: {e}. Adding to troubles')
             troubles |= set(sites[i:i + GROUP_SIZE])

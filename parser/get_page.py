@@ -1,3 +1,5 @@
+import time
+
 import aiohttp
 import asyncio
 import validators
@@ -13,7 +15,16 @@ async def wait_for_page(url):
         await asyncio.sleep(1)
 
 
-async def process_page(session, url, root, binary, semaphore):
+async def check_response(session, url, response, text):
+    while '503' in text and 'Service' in text:
+        await asyncio.sleep(1)
+        response = await session.get(url, headers=get_headers())
+        text = await response.text(errors='replace')
+
+    return response, text
+
+
+async def process_page(session, url, root, binary, semaphore: asyncio.Semaphore):
     global page_index
 
     await asyncio.sleep(0.1)
@@ -40,10 +51,10 @@ async def process_page(session, url, root, binary, semaphore):
 
         text = await response.text(errors='replace')
 
-        while '503' in text and 'Service' in text:
-            await asyncio.sleep(1)
-            response = await session.get(url, headers=get_headers())
-            text = await response.text(errors='replace')
+        try:
+            response, text = await asyncio.wait_for(check_response(session, url, response, text), 5)
+        except asyncio.TimeoutError:
+            pass
 
         text = make_links_absolute(text, url)
         text = text[:text.rfind('<!-- copyright (t2) -->')]
@@ -70,7 +81,7 @@ async def process_page(session, url, root, binary, semaphore):
 
         for link in set(soup.findAll('a')):
             link = link.get('href')
-            if link and site in link:
+            if link and site in link and 'narod.ru' in link:
                 task = asyncio.create_task(
                     get_page(session, link, semaphore, index))
                 tasks.append(task)
@@ -86,6 +97,7 @@ async def process_page(session, url, root, binary, semaphore):
 async def safe_run(coro, url, semaphore: asyncio.BoundedSemaphore):
     try:
         await semaphore.acquire()
+        # print(semaphore._value)
         print('start', url)
         return await coro
     except aiohttp.ClientConnectorError:

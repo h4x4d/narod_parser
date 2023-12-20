@@ -2,7 +2,7 @@ import datetime
 
 from constants import DATABASE, FILENAME
 from parser import split_and_gather_sites
-from database import create_database, fill_database
+from database import create_database
 
 import asyncio
 

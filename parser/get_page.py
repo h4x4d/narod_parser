@@ -97,7 +97,6 @@ async def process_page(session, url, root, binary, semaphore: asyncio.Semaphore)
 async def safe_run(coro, url, semaphore: asyncio.BoundedSemaphore):
     try:
         await semaphore.acquire()
-        # print(semaphore._value)
         print('start', url)
         return await coro
     except aiohttp.ClientConnectorError:
